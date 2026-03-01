@@ -2,36 +2,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-
-
-
 from abc import ABC, abstractmethod
 
 #%% Loader Classes
-class DataSource(ABC):
+class DataSource():
     def __init__(self, path:str):
         self.path = path
     
-    @abstractmethod
-    def load(self) -> pd.DataFrame:
-        pass
 
 
-class RedditLoader(DataSource):
+class Binance(DataSource):
     def __init__(self, path):
         super().__init__(path)
-        self.data = None
-    def load(self):
         self.data = pd.read_csv(self.path)
-        return self.data
 
-class BinanceLoader(DataSource):
+class Reddit(DataSource):
     def __init__(self, path):
-        self.data = None
         super().__init__(path)
-    def load(self):
         self.data = pd.read_csv(self.path)
-        return (self.data)
     def get_num_users(self):
        return pd.concat([self.data['from'], self.data['to']]).nunique()
     def get_num_posts(self):
@@ -41,16 +29,121 @@ class BinanceLoader(DataSource):
     def get_self_posts(self):
         return (self.data['from'] == self.data['to']).sum()
 
-class NetworkLoader(RedditLoader):
-    def __init__(self,path, data):
+class Network(DataSource):
+    def __init__(self,path):
+        import pickle        
         super().__init__(path)
-        self.data = None
-    def load(self):
-        import pickle
-        with open(self.path, "wb") as f:
-            pickle.dump(self.data, f)
         with open(self.path, "rb") as f:
             self.data = pickle.load(f)
+
+#%%% Plotters 
+
+class RedditPlotter:
+    """Plot Reddit-specific metrics"""
+    
+    def __init__(self, figsize=(14, 5)):
+        self.figsize = figsize
+    
+    def mod_activity(self, timestamps, mod_activity, 
+                     title='Reddit Activity Over Time: Moderators vs Non-Moderators') -> plt.Figure:
+        """Moderator activity only"""
+        
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        ax.plot(timestamps, mod_activity, label='Moderator Activity', color='blue')
+        
+        ax.set_title(title)
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Number of Posts/Comments')
+        ax.legend()
+        
+        fig.tight_layout()
+        return fig
+    
+    def mod_vs_nonmod(self, timestamps, mod_activity, nonmod_activity,
+                      title='Reddit Activity Over Time: Moderators vs Non-Moderators') -> plt.Figure:
+        """Moderator vs Non-Moderator activity"""
+        
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        ax.plot(timestamps, mod_activity, label='Moderator Activity', color='blue')
+        ax.plot(timestamps, nonmod_activity, label='Non-Moderator Activity', color='orange', alpha=0.7)
+        
+        ax.set_title(title)
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Number of Posts/Comments')
+        ax.legend()
+        
+        fig.tight_layout()
+        return fig
+    
+    def mod_vs_nonmod_log(self, timestamps, mod_activity, nonmod_activity,
+                          title='Reddit Activity Over Time: Moderators vs Non-Moderators') -> plt.Figure:
+        """Moderator vs Non-Moderator activity (log scale)"""
+        
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        ax.plot(timestamps, mod_activity, label='Moderator Activity', color='blue')
+        ax.plot(timestamps, nonmod_activity, label='Non-Moderator Activity', color='orange', alpha=0.7)
+        ax.set_yscale('log')
+        
+        ax.set_title(title)
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Number of Posts/Comments')
+        ax.legend()
+        
+        fig.tight_layout()
+        return fig
+
+
+class BinancePlotter:
+    """Plot Binance price data"""
+    
+    def __init__(self, figsize=(14, 6)):
+        self.figsize = figsize
+    
+    def closing_price(self, timestamps, close_price,
+                      title='Dogecoin Closing Price (Binance)') -> plt.Figure:
+        """Closing price over time"""
+        
+        fig, ax = plt.subplots(figsize=self.figsize)
+        
+        ax.plot(timestamps, close_price, color='green')
+        
+        ax.set_title(title)
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Close Price (USD)')
+        
+        fig.tight_layout()
+        return fig
+
+
+class CombinedPlotter:
+    """Plot Reddit and Binance data together"""
+    
+    def __init__(self, figsize=(16, 8)):
+        self.figsize = figsize
+    
+    def price_and_mod_activity(self, price_timestamps, close_price, 
+                               activity_timestamps, mod_activity,
+                               title='Dogecoin Price & Moderator Activity Over Time') -> plt.Figure:
+        """Price on top, moderator activity on bottom (stacked, shared x-axis)"""
+        
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=self.figsize, sharex=True)
+        
+        # Top: Price
+        ax1.plot(price_timestamps, close_price, color='green')
+        ax1.set_ylabel('DOGE Price (USD)')
+        ax1.set_title(title)
+        
+        # Bottom: Moderator activity
+        ax2.plot(activity_timestamps, mod_activity, label='Moderator Activity', color='blue')
+        ax2.set_ylabel('Moderator Activity')
+        ax2.set_xlabel('Date')
+        ax2.legend()
+        
+        fig.tight_layout()
+        return fig
 
 
 
@@ -65,11 +158,6 @@ def get_bet_cent():
     bet_cent = nx.betweenness_centrality(G, k=100, seed=42)
     return(bet_cent)
 
-class Plotter(ABC):
-    def __init__():
-
-
-def 
 
 
 def plot(x1, x1_label, y1, y1_label, plot_label = 'Some Plot Label', title="some title", color1 = 'blue' plot2 = False, x2, y2, plot_label2 = 'Some Plot Label', color2='orange', log=False):
@@ -87,42 +175,6 @@ def plot(x1, x1_label, y1, y1_label, plot_label = 'Some Plot Label', title="some
     plt.show()
 
 
-
-#%%
-class Graph():
-    def __init__(self):
-        
-
-class Degrees(Graph):
-    def __init__(self, degrees:np.ndarray):
-        self.degrees = [deg for node, deg in Graph.degree]
-    def get_median(self):
-        return np.median(self.degrees)
-    def get_mean(self):
-        return np.mean(self.degrees)
-    def get_top_degrees(self):
-        top_degrees = sorted(self.degrees, key=lambda x: x[1], reverse=True)[:10]
-        print("Top 10 users by degree:")
-        for user, deg in top_degrees:
-            print(user, deg)
-
-    def plot_degree_dist(self):
-        # Plot histogram (linear scale)
-        plt.figure(figsize=(8,5))
-        plt.boxplot(self.degrees)
-        plt.title("Degree Distribution (User Interaction Network)")
-        plt.xlabel("Degree (number of unique users interacted with)")
-        plt.ylabel("Number of users")
-        plt.show()
-    def plot_degree_log_dist(self):
-        plt.figure(figsize=(8,5))
-        plt.hist(self.degrees, bins=30, color='salmon', edgecolor='black', log=True)
-        plt.title("Degree Distribution (Log Scale)")
-        plt.xlabel("Degree")
-        plt.ylabel("Number of users (log scale)")
-        plt.show()
-
-    
 
 
 # list of moderators
@@ -163,59 +215,73 @@ def create_activity():
 
 
 
-###### EXECUTION ###########
+#%% ###### EXECUTION ###########
 
-reddit = Dataloader(path='/data/final_sorted.csv')
-binance = Dataloader(path='Binance_DOGEUSDT_1h.csv')
+reddit = Reddit(path='data/final_sorted.csv')
+reddit_df = reddit.data
+binance = Binance(path='data/Binance_DOGEUSDT_1h.csv')
+binance_df = binance.data
+G = Network(path="data/user_interaction_network.pkl")
+
+#%%
+# Number of unique users
+n_users = reddit.get_num_users()
+print("Unique users:", n_users)
+
+# Number of posts vs comments
+n_posts = reddit.get_num_posts()
+n_comments = reddit.get_num_comments()
+print("Posts:", n_posts)
+print("Comments:", n_comments)
+
+# Self-posts (new threads)
+self_posts = reddit.get_self_posts()
+print("Thread-starting posts:", self_posts)
+
+# Degree centrality
+deg_cent = nx.degree_centrality(G)
+
+# Betweenness centrality (sample if graph is large)
+bet_cent = nx.betweenness_centrality(G, k=100, seed=42)
+
+# Show top users
+top_deg = sorted(deg_cent.items(), key=lambda x: x[1], reverse=True)[:10]
+top_bet = sorted(bet_cent.items(), key=lambda x: x[1], reverse=True)[:10]
+
+print("Top degree centrality:", top_deg)
+print("Top betweenness centrality:", top_bet)
 
 
+#%%%
+# making plots
+reddit_plotter = RedditPlotter()
+fig1 = reddit_plotter.mod_activity(daily_activity.index, daily_activity['mod_activity'])
+plt.show()
 
+fig2 = reddit_plotter.mod_vs_nonmod(
+    daily_activity.index, 
+    daily_activity['mod_activity'], 
+    daily_activity['non_mod_activity']
+)
+plt.show()
 
+fig3 = reddit_plotter.mod_vs_nonmod_log(
+    daily_activity.index, 
+    daily_activity['mod_activity'], 
+    daily_activity['non_mod_activity']
+)
+plt.show()
 
-plot(x=daily_activity.index,xlabel='Date', y=daily_activity['mod_activity'], ylabel='Number of Posts/Comments', plot_label='Moderator Activity', title='Reddit Activity Over Time: Moderators vs Non-Moderators')
+binance_plotter = BinancePlotter()
+fig4 = binance_plotter.closing_price(price_df['Date'], price_df['Close'])
+plt.show()
 
-#plot_mod_activity
-plot(daily_activity.index,'Date',daily_activity['mod_activity'], 'Number of Posts/Comments', plot_label='Moderator Activity',title='Reddit Activity Over Time: Moderators vs Non-Moderators',color1='blue',
-        plot2=True, daily_activity.index, daily_activity['non_mod_activity'], plot_label2='Non-Moderator Activity',color2 = 'orange')
+combined_plotter = CombinedPlotter()
+fig5 = combined_plotter.price_and_mod_activity(
+    price_df['Date'], 
+    price_df['Close'],
+    daily_activity.index, 
+    daily_activity['mod_activity']
+)
+plt.show()
 
-#plot_mod_log_activity
-plot(daily_activity.index,'Date',daily_activity['mod_activity'], 'Number of Posts/Comments', plot_label='Moderator Activity',title='Reddit Activity Over Time: Moderators vs Non-Moderators',color1='blue',
-        plot2=True, daily_activity.index, daily_activity['non_mod_activity'], plot_label2='Non-Moderator Activity',color2 = 'orange', log=True)
-
-
-
-binance['Date'] = pd.to_datetime(binance['Date'], errors='coerce')
-binance = binance.dropna(subset=['Date'])  # drop bad timestamps
-
-# 2️⃣ Sort by date (important)
-binance = binance.sort_values('Date')
-
-# 3️⃣ Plot closing price over time
-plot(price_reddit['Date'], 'Date', binance['Close'], 'Close Price (USD)', '', 'Dogecoin Closing Price (Binance)', color1='grren', plot2=False)
-
-
-
-all_dates = pd.date_range(start=min(price_reddit.index.min(), daily_mod_counts.index.min()),
-                        end=max(price_reddit.index.max(), daily_mod_counts.index.max()))
-daily_mod_counts = daily_mod_counts.reindex(all_dates, fill_value=0)
-
-def stacked_plots():
-    # 2 stacked subplots with shared x-axis
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16,8), sharex=True)
-
-    # Top: Dogecoin price
-    ax1.plot(price_reddit.index, price_reddit['Close'], color='green')
-    ax1.set_ylabel('DOGE Price (USD)')
-    ax1.set_title('Dogecoin Price & Moderator Activity Over Time')
-
-    ax2.plot(daily_activity.index, daily_activity['mod_activity'], label='Moderator Activity', color='blue')
-    ax2.set_ylabel('Moderator Activity')
-    ax2.set_xlabel('date')
-
-    plt.tight_layout()
-    plt.show()
-stacked_plots
-
-# Get top 5 days with highest moderator activity
-top_mod_days = daily_activity['mod_activity'].sort_values(ascending=False).head(5)
-print(top_mod_days)
