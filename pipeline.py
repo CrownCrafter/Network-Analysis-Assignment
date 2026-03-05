@@ -1,3 +1,4 @@
+#%%
 import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -17,7 +18,7 @@ class Binance(DataSource):
         self.data = pd.read_csv(self.path)
 
 class Reddit(DataSource):
-    def __init__(self, path = 'dataset/final_sorted.csv'):
+    def __init__(self, path):
         super().__init__(path)
         self.data = pd.read_csv(self.path)
         self.set_moderator_status()
@@ -37,10 +38,18 @@ class Reddit(DataSource):
 
 class Network(DataSource):
     def __init__(self,path):
-        import pickle        
-        super().__init__(path)
+        import pickle 
+        import os       
+        super().__init__(path)    
+        # Use context manager to properly close the file
         with open(self.path, "rb") as f:
             self.data = pickle.load(f)
+    def get_deg_cent(self):
+        return nx.degree_centrality(self.data)
+    def get_bet_cent(self):
+        # betweenness centrality (sample if graph is large)
+        return(nx.betweenness_centrality(self.data, k=100, seed=42))
+
 
 #%%% Plotters 
 
@@ -152,84 +161,19 @@ class CombinedPlotter:
         return fig
 
 
-
-
-def get_deg_cent():
-    # degree centrality
-    deg_cent = nx.degree_centrality(G)
-    return(deg_cent)
-
-def get_bet_cent():
-    # betweenness centrality (sample if graph is large)
-    bet_cent = nx.betweenness_centrality(G, k=100, seed=42)
-    return(bet_cent)
-
-
-
-# def plot(x1, x1_label, y1, y1_label, plot_label = 'Some Plot Label', title="some title", color1 = 'blue' plot2 = False, x2, y2, plot_label2 = 'Some Plot Label', color2='orange', log=False):
-#     plt.figure(figsize=(14,5))
-#     plt.plot(x,y,plot_label, color=color1)
-#     if plot2:
-#         plt.plot(x,y,label_scnd_plot, color=color2)
-#     plt.title(title)
-#     plt.xlabel(xlabel)
-#     plt.ylabel(ylabel)
-#     if log:
-#         plt.yscale('log')
-#     plt.legend()
-#     plt.tight_layout()
-#     plt.show()
-
-
-
+#%% 
 if __name__ == '__main__':
     # list of moderators
     mod_list = ['42points', 'Jools1802', 'GoodShibe', 'jimjunkdude', 'FloodgatesBot', 'RepostSleuthBot', 'AutoModerator']
-    reddit["is_moderator"] = reddit["from"].isin(mod_list)
-    reddit["to_moderator"] = reddit["to"].isin(mod_list)
-    reddit[reddit['is_moderator'] == 1]['from'].value_counts()
-    reddit[reddit['to_moderator'] == 1]['to'].value_counts()
-    raw_posts_only = reddit[(reddit['post.id'] == reddit['comment.id']) & (reddit['post.id']== reddit['parent.id'])]
-    raw_posts_only[raw_posts_only['is_moderator'] == 1]
-    # % of edges(posts/comments) (which involve mods)
-    mod_edge_share = (
-        (reddit["is_moderator"] | reddit["to_moderator"]).mean()
-    )
-    all_nodes = pd.unique(pd.concat([reddit["from"], reddit["to"]]))
-    mod_nodes = reddit.loc[reddit["is_moderator"], "from"].unique()
-    # % of nodes (users) who are mods
-    mod_node_share = len(mod_nodes) / len(all_nodes)
-
-    float(mod_edge_share*100), mod_node_share * 100
-    reddit[reddit["is_moderator"]].groupby("from")["utc"].agg(["min","max"])
-
-
-    reddit['date'] = pd.to_datetime(reddit['time'], errors='coerce')
-    reddit = reddit.dropna(subset=['date'])
-    reddit['day'] = reddit['date'].dt.normalize()
-
-    daily_mod_counts = reddit[reddit['is_moderator']].groupby('day')['is_moderator'].count()
-    daily_nonmod_counts = reddit[~reddit['is_moderator']].groupby('day')['is_moderator'].count()
-
-    def create_activity():
-    # merge
-        daily_activity = pd.concat([daily_mod_counts, daily_nonmod_counts], axis=1)
-        daily_activity.columns = ['mod_activity', 'non_mod_activity']
-        daily_activity = daily_activity.fillna(0)
-        print(daily_activity.head())
-
-
-
-
-    #%% ###### EXECUTION ###########
-
+    
+    # Load data
     reddit = Reddit(path='data/final_sorted.csv')
     reddit_df = reddit.data
+    
     binance = Binance(path='data/Binance_DOGEUSDT_1h.csv')
     binance_df = binance.data
     G = Network(path="data/user_interaction_network.pkl")
-
-    #%%
+    
     # Number of unique users
     n_users = reddit.get_num_users()
     print("Unique users:", n_users)
@@ -245,10 +189,10 @@ if __name__ == '__main__':
     print("Thread-starting posts:", self_posts)
 
     # Degree centrality
-    deg_cent = nx.degree_centrality(G)
+    deg_cent = nx.degree_centrality(G.data)
 
     # Betweenness centrality (sample if graph is large)
-    bet_cent = nx.betweenness_centrality(G, k=100, seed=42)
+    bet_cent = nx.betweenness_centrality(G.data, k=100, seed=42)
 
     # Show top users
     top_deg = sorted(deg_cent.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -257,9 +201,49 @@ if __name__ == '__main__':
     print("Top degree centrality:", top_deg)
     print("Top betweenness centrality:", top_bet)
 
+    # Moderator analysis
+    reddit_df["is_moderator"] = reddit_df["from"].isin(mod_list)
+    reddit_df["to_moderator"] = reddit_df["to"].isin(mod_list)
+    reddit_df[reddit_df['is_moderator'] == 1]['from'].value_counts()
+    reddit_df[reddit_df['to_moderator'] == 1]['to'].value_counts()
+    raw_posts_only = reddit_df[(reddit_df['post.id'] == reddit_df['comment.id']) & (reddit_df['post.id']== reddit_df['parent.id'])]
+    raw_posts_only[raw_posts_only['is_moderator'] == 1]
+    
+    # % of edges(posts/comments) (which involve mods)
+    mod_edge_share = (
+        (reddit_df["is_moderator"] | reddit_df["to_moderator"]).mean()
+    )
+    all_nodes = pd.unique(pd.concat([reddit_df["from"], reddit_df["to"]]))
+    mod_nodes = reddit_df.loc[reddit_df["is_moderator"], "from"].unique()
+    # % of nodes (users) who are mods
+    mod_node_share = len(mod_nodes) / len(all_nodes)
 
-    #%%%
-    # making plots
+    print(float(mod_edge_share*100), mod_node_share * 100)
+    reddit_df[reddit_df["is_moderator"]].groupby("from")["time"].agg(["min","max"])
+
+    # Create daily activity dataframe
+    reddit_df['date'] = pd.to_datetime(reddit_df['time'], errors='coerce')
+    reddit_df = reddit_df.dropna(subset=['date'])
+    reddit_df['day'] = reddit_df['date'].dt.normalize()
+
+    daily_mod_counts = reddit_df[reddit_df['is_moderator']].groupby('day')['is_moderator'].count()
+    daily_nonmod_counts = reddit_df[~reddit_df['is_moderator']].groupby('day')['is_moderator'].count()
+
+    def create_activity():
+        # merge
+        daily_activity = pd.concat([daily_mod_counts, daily_nonmod_counts], axis=1)
+        daily_activity.columns = ['mod_activity', 'non_mod_activity']
+        daily_activity = daily_activity.fillna(0)
+        print(daily_activity.head())
+        return daily_activity
+    
+    daily_activity = create_activity()
+    
+    # Prepare price data
+    price_df = binance_df[['Date', 'Close']].copy()
+    price_df['Date'] = pd.to_datetime(price_df['Date'], errors='coerce')
+    
+    # Making plots
     reddit_plotter = RedditPlotter()
     fig1 = reddit_plotter.mod_activity(daily_activity.index, daily_activity['mod_activity'])
     plt.show()
@@ -291,3 +275,4 @@ if __name__ == '__main__':
     )
     plt.show()
 
+# %%
