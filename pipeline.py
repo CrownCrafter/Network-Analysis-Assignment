@@ -4,7 +4,10 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from abc import ABC, abstractmethod
+import pickle
 
+from torch_geometric.data import Data
+import torch
 #%% Loader Classes
 class DataSource():
     def __init__(self, path:str):
@@ -18,7 +21,7 @@ class Binance(DataSource):
         self.data = pd.read_csv(self.path)
 
 class Reddit(DataSource):
-    def __init__(self, path):
+    def __init__(self, path = 'dataset/final_sorted.csv'):
         super().__init__(path)
         self.data = pd.read_csv(self.path)
         self.set_moderator_status()
@@ -132,6 +135,25 @@ class BinancePlotter:
         fig.tight_layout()
         return fig
 
+def networkx_to_pyg(G, node_features=None):
+    """Convert your NetworkX graph to PyG format"""
+    # Create node mapping
+    node_list = list(G.nodes())
+    node_to_idx = {node: idx for idx, node in enumerate(node_list)}
+    
+    # Create edge index
+    edge_list = [(node_to_idx[u], node_to_idx[v]) for u, v in G.edges()]
+    edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
+    
+    # Node features (if none provided, use degree)
+    if node_features is None:
+        degrees = [G.degree(node) for node in node_list]
+        x = torch.tensor(degrees, dtype=torch.float).view(-1, 1)
+    else:
+        x = node_features
+    
+    data = Data(x=x, edge_index=edge_index, num_nodes=len(node_list))
+    return data, node_to_idx
 
 class CombinedPlotter:
     """Plot Reddit and Binance data together"""
@@ -160,7 +182,11 @@ class CombinedPlotter:
         fig.tight_layout()
         return fig
 
-
+def load_pickle(file_path):
+    # load pickle from filepath
+    with open(file_path, 'rb') as f:
+        output = pickle.load(f)
+    return output
 #%% 
 if __name__ == '__main__':
     # list of moderators
